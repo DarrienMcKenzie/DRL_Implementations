@@ -6,7 +6,9 @@ import matplotlib.pyplot as plt
 
 if __name__ == "__main__":
 	print("\nSTART MAIN")
-	env = gym.make('CartPole-v1')
+	env = gym.make('PongNoFrameskip-v4',render_mode='human')
+	env = gym.wrappers.AtariPreprocessing(env, noop_max=30, frame_skip=4, screen_size=84, terminal_on_life_loss=False, grayscale_obs=True)
+	env = gym.wrappers.FrameStack(env,4)
 	
 	minibatch_size = 32
 	replay_memory_size = 10000
@@ -20,8 +22,9 @@ if __name__ == "__main__":
 	
 	max_episodes = 10000
 	max_timesteps = 200
-
-	agent = DQN(env,'classic',learning_rate=0.1)
+	
+	agent = DQN(env,'atari',learning_rate=0.1)
+	
 	
 	agent.train(max_episodes, 
 	max_timesteps, 
@@ -31,4 +34,13 @@ if __name__ == "__main__":
 	minibatch_size,
 	target_network_update_frequency)
 	
+	env.reset()
+	for i in range(2):
+		obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
+		print(obs)
+		print(len(obs))
+		print(len(obs[0]))
+		print(len(obs[0][0]))
+		print()
+		env.render()
 	print("END MAIN")
