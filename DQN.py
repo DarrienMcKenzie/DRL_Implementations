@@ -16,9 +16,6 @@ class DQN():
 		self.env = env
 		self.env_type = env_type
 		
-		#memory parameters
-		#self.memory = deque(memory_capacity)
-		
 		#creating networks
 		self.create_Q_networks(env,learning_rate)
 		
@@ -36,15 +33,16 @@ class DQN():
 			
 		elif self.env_type == 'atari':
 			model.add(Input(shape=(84,84,4)))
-			model.add(Conv2D(filters=32, kernel_size=(8,8), strides=4, activation='relu'))
+			model.add(Conv2D(filters=32, kernel_size=(8,8),padding="same", strides=4, activation='relu'))
 			model.add(Conv2D(filters=64, kernel_size=(4,4), strides=2, activation='relu'))
 			model.add(Conv2D(filters=64, kernel_size=(3,3), strides=1, activation='relu'))
 			model.add(Flatten())
 			model.add(Dense(512, activation='relu'))
 			model.add(Dense(self.env.action_space.n))
 			
-			model.compile(loss="mean_squared_error",optimizer=RMSprop(learning_rate=lr))
-					
+		model.compile(loss="mean_squared_error",optimizer=RMSprop(learning_rate=lr))
+		model.summary()
+			
 		self.Q_network = model #Q
 		self.Q_target_network = model #Q^
 		
@@ -52,8 +50,24 @@ class DQN():
 		if np.random.random() < epsilon:
 			action = self.env.action_space.sample()
 		else:
-			state = state.reshape(1,len(state))
-			action = np.argmax(self.Q_network.predict(state,verbose=0))
+			#state = state.reshape(1,len(state))
+			#state = np.array(state)
+			#state = tf.convert_to_tensor(state)
+			#state = tf.reshape(state,(84,84,4))
+			#state = tf.expand_dims(state, axis=0)
+			
+			#state = state.reshape(4,84,84)
+			print("ARG:")
+			print(state)
+			#print(state)
+			print("ARG SHAPE:")
+			print(state.shape)
+			
+			prediction = self.Q_network.predict(state,verbose=0)
+			action = np.argmax(prediction)
+			print("ACTION SPACE: ", self.env.action_space)
+			print("PREDICTION: ", prediction)
+			print("ACTION: ", action)
 		return action
 		
 	def experience_replay(self, memory,minibatch_size,gamma):
@@ -63,8 +77,8 @@ class DQN():
 		sampled_transitions = random.sample(memory, minibatch_size)
 		for transition in sampled_transitions:
 			state, action, reward, next_state, terminal_state = transition
-			state = state.reshape(1, len(state))
-			next_state = state.reshape(1, len(next_state))
+			#state = state.reshape(1, len(state)) #FORMATTING STATE FOR CLASSIC
+			#next_state = state.reshape(1, len(next_state)) #FORMATTING STATE FOR CLASSIC
 			
 			Q_target = self.Q_target_network.predict(state,verbose=0)
 	
@@ -82,6 +96,17 @@ class DQN():
 		new_frame = new_frame.reshape(new_frame_size[0], new_frame_size[1]) / 255 #normalizing frame data
 		
 		return new_frame
+		
+	def format_state(self, state):
+		if self.env_type == 'classic':
+			formatted_state = state.reshape(1, len(state))
+			
+		elif self.env_type == 'atari':
+			formatted_state = tf.convert_to_tensor(state)
+			formatted_state = tf.reshape(formatted_state,(84,84,4))
+			formatted_state = tf.expand_dims(formatted_state, axis=0)
+			formatted_state = formatted_state / 255
+		return formatted_state
 	
 	def train(self, max_episodes, max_timesteps, replay_memory_size, gamma, epsilon,minibatch_size,target_network_update_frequency):
 		#print("SELF: ", self)
@@ -133,11 +158,13 @@ class DQN():
 				print()
 				print("EPISODE #" + str(m))
 				state, info = self.env.reset()
+				state = self.format_state(state)
 				time_since_network_reset = 0
 				for t in range(max_timesteps):
 					print("T = ", t)
 					action = self.get_action(state,epsilon)
 					next_state, reward, terminated, truncated, info = self.env.step(action)
+					next_state = self.format_state(next_state)
 					episode_reward += reward
 					terminal_state = bool(terminated) + bool(truncated)
 					transition = [state, action, reward, next_state, terminal_state]

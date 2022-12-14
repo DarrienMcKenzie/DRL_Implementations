@@ -34,13 +34,21 @@ if __name__ == "__main__":
 	minibatch_size,
 	target_network_update_frequency)
 	
+	"""
 	env.reset()
 	for i in range(2):
 		obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
-		print(obs)
+		#print("OBS", obs)
+		print("NEW OBS:")
+		new_obs = tf.convert_to_tensor(np.array(obs))
+		print(new_obs)
+		
+		print(type(obs))
+		print(type(np.array(obs)))
 		print(len(obs))
 		print(len(obs[0]))
 		print(len(obs[0][0]))
 		print()
 		env.render()
+		"""
 	print("END MAIN")
