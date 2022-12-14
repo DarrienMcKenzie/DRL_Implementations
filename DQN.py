@@ -11,10 +11,11 @@ from keras.optimizers import RMSprop
 
 
 class DQN():
-	def __init__(self,env,env_type,learning_rate):
+	def __init__(self,agent_name,env,env_type,learning_rate,momentum):
 		#environment parameters
 		self.env = env
 		self.env_type = env_type
+		self.agent_name = agent_name
 		
 		#creating networks
 		self.create_Q_networks(env,learning_rate)
@@ -46,28 +47,12 @@ class DQN():
 		self.Q_network = model #Q
 		self.Q_target_network = model #Q^
 		
-	def get_action(self,state,epsilon):
-		if np.random.random() < epsilon:
+	def get_action(self,state):
+		if np.random.random() < self.epsilon:
 			action = self.env.action_space.sample()
 		else:
-			#state = state.reshape(1,len(state))
-			#state = np.array(state)
-			#state = tf.convert_to_tensor(state)
-			#state = tf.reshape(state,(84,84,4))
-			#state = tf.expand_dims(state, axis=0)
-			
-			#state = state.reshape(4,84,84)
-			print("ARG:")
-			print(state)
-			#print(state)
-			print("ARG SHAPE:")
-			print(state.shape)
-			
-			prediction = self.Q_network.predict(state,verbose=0)
-			action = np.argmax(prediction)
-			print("ACTION SPACE: ", self.env.action_space)
-			print("PREDICTION: ", prediction)
-			print("ACTION: ", action)
+			action = np.argmax(self.Q_network.predict(state,verbose=0))
+
 		return action
 		
 	def experience_replay(self, memory,minibatch_size,gamma):
@@ -108,88 +93,71 @@ class DQN():
 			formatted_state = formatted_state / 255
 		return formatted_state
 	
-	def train(self, max_episodes, max_timesteps, replay_memory_size, gamma, epsilon,minibatch_size,target_network_update_frequency):
-		#print("SELF: ", self)
-		#print("MAX EPISODES: ", max_episodes)
-		#print("MAX TIMESTEPS: ", max_timesteps)
-		#print("REPLAY MEMORY SIZE: ", replay_memory_size)
-		#print("GAMMA: ", gamma)
-		memory = deque(maxlen=replay_memory_size)
+	def decay_epsilon(self):
+		self.epsilon = self.epsilon*self.epsilon_decay
 		
-		if self.env_type == 'classic':
-			print("TRAINING...")
-			episode_rewards = []
-			average_episode_rewards = []
-			for m in range(max_episodes):
-				episode_reward = 0
-				print()
-				print("EPISODE #" + str(m))
-				state, info = self.env.reset()
-				time_since_network_reset = 0
-				for t in range(max_timesteps):
-					print("T = ", t)
-					action = self.get_action(state,epsilon)
-					next_state, reward, terminated, truncated, info = self.env.step(action)
-					episode_reward += reward
-					terminal_state = bool(terminated) + bool(truncated)
-					transition = [state, action, reward, next_state, terminal_state]
-					memory.append(transition)
+		if self.epsilon < self.final_epsilon:
+			self.epsilon = self.final_epsilon
+	
+	def train(self, max_episodes, max_timesteps, replay_memory_size, gamma, initial_epsilon,final_epsilon,epsilon_decay,minibatch_size,target_network_update_frequency,replay_start_size):
+		memory = deque(maxlen=replay_memory_size)
 					
-					state = next_state
-					
+		print("BEGIN TRAINING...")
+		episode_rewards = []
+		average_episode_rewards = []
+		
+		self.epsilon = initial_epsilon
+		self.epsilon_decay = epsilon_decay
+		self.final_epsilon = final_epsilon
+		
+		total_steps = 0
+		for m in range(max_episodes):
+			episode_reward = 0
+			print()
+			print("EPISODE #" + str(m))
+			state, info = self.env.reset()
+			state = self.format_state(state)
+			time_since_network_reset = 0
+			for t in range(max_timesteps):
+				#print("T = ", t)
+				action = self.get_action(state)
+				next_state, reward, terminated, truncated, info = self.env.step(action)
+				next_state = self.format_state(next_state)
+				episode_reward += reward
+				terminal_state = bool(terminated) + bool(truncated)
+				transition = [state, action, reward, next_state, terminal_state]
+				memory.append(transition)
+				
+				state = next_state
+				total_steps += 1
+				
+				if total_steps > replay_start_size:
+					self.decay_epsilon()
 					self.experience_replay(memory,minibatch_size,gamma)
-					
+				
 					if time_since_network_reset >= target_network_update_frequency:
 						self.Q_target_network = clone_model(self.Q_network)
 						time_since_network_reset = 0
-					
-					if terminated or truncated:
-						print("EPISODE TERMINATED. TOTAL REWARD = " + str(episode_reward))
-						episode_rewards.append(episode_reward)
-						average_episode_rewards.append(np.mean(np.array(episode_reward)))
-						break			
-						
-		elif self.env_type == 'atari':
-			print("TRAINING...")
-			episode_rewards = []
-			average_episode_rewards = []
-			for m in range(max_episodes):
-				episode_reward = 0
-				print()
-				print("EPISODE #" + str(m))
-				state, info = self.env.reset()
-				state = self.format_state(state)
-				time_since_network_reset = 0
-				for t in range(max_timesteps):
-					print("T = ", t)
-					action = self.get_action(state,epsilon)
-					next_state, reward, terminated, truncated, info = self.env.step(action)
-					next_state = self.format_state(next_state)
-					episode_reward += reward
-					terminal_state = bool(terminated) + bool(truncated)
-					transition = [state, action, reward, next_state, terminal_state]
-					memory.append(transition)
-					
-					state = next_state
-					
-					self.experience_replay(memory,minibatch_size,gamma)
-					
-					if time_since_network_reset >= target_network_update_frequency:
-						self.Q_target_network = clone_model(self.Q_network)
-						time_since_network_reset = 0
-					
-					if terminated or truncated:
-						print("EPISODE TERMINATED. TOTAL REWARD = " + str(episode_reward))
-						episode_rewards.append(episode_reward)
-						average_episode_rewards.append(np.mean(np.array(episode_reward)))
-						break
+				
+				if terminated or truncated:
+					print("EPISODE TERMINATED. TOTAL REWARD = " + str(episode_reward))
+					episode_rewards.append(episode_reward)
+					average_episode_rewards.append(np.mean(np.array(episode_reward)))
+					break
 		
 		print("TRAINING COMPLETED")
 		
+		print("Saving model...")
+		self.Q_network.save(self.agent_name+"Model.h5")
+		self.Q_network.save_weights(self.agent_name+"Weights.h5")
+		print("Model saved.")
+		
+		print("Plotting results...")
 		x = np.arange(0,max_episodes)
 		y = np.array(average_episode_rewards)
-		plt.title("Average Episode Reward vs. Episodes")
+		plt.title("Average Episode Reward vs. Episodes - " + self.agent_name)
 		plt.xlabel("Episodes")
 		plt.ylabel("Average Reward")
 		plt.plot(x,y)
-		plt.savefig('results.png')
+		plt.savefig(self.agent_name + 'results_average_reward.png')
+		print("Results saved.")

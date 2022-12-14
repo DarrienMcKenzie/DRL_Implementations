@@ -10,6 +10,8 @@ if __name__ == "__main__":
 	env = gym.wrappers.AtariPreprocessing(env, noop_max=30, frame_skip=4, screen_size=84, terminal_on_life_loss=False, grayscale_obs=True)
 	env = gym.wrappers.FrameStack(env,4)
 	
+	agent_name = "PongSolver"
+	
 	minibatch_size = 32
 	replay_memory_size = 10000
 	agent_history_length = None
@@ -23,7 +25,7 @@ if __name__ == "__main__":
 	max_episodes = 10000
 	max_timesteps = 200
 	
-	agent = DQN(env,'atari',learning_rate=0.1)
+	agent = DQN(env,'atari',learning_rate=0.1, agent_name)
 	
 	
 	agent.train(max_episodes, 
@@ -34,21 +36,4 @@ if __name__ == "__main__":
 	minibatch_size,
 	target_network_update_frequency)
 	
-	"""
-	env.reset()
-	for i in range(2):
-		obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
-		#print("OBS", obs)
-		print("NEW OBS:")
-		new_obs = tf.convert_to_tensor(np.array(obs))
-		print(new_obs)
-		
-		print(type(obs))
-		print(type(np.array(obs)))
-		print(len(obs))
-		print(len(obs[0]))
-		print(len(obs[0][0]))
-		print()
-		env.render()
-		"""
 	print("END MAIN")
