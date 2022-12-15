@@ -1,3 +1,11 @@
+"""
+Author: Darrien McKenzie
+Class: Theory of Reinforcement Learning (CS5001)
+Program Name: DQN
+Description: Implementing a Deep Q-Network able to be applied to OpenAI gym environments and
+achieve optimal performance within them.
+"""
+
 import gym
 import numpy as np
 import tensorflow as tf
@@ -54,7 +62,12 @@ class DQN():
 			action = np.argmax(self.Q_network.predict(state,verbose=0))
 
 		return action
-	
+		
+	def decay_epsilon(self):
+		self.epsilon = self.epsilon*self.epsilon_decay
+		
+		if self.epsilon < self.final_epsilon:
+			self.epsilon = self.final_epsilon
 		
 	def experience_replay(self, memory,minibatch_size,gamma):
 		if len(memory) < minibatch_size:
@@ -106,11 +119,6 @@ class DQN():
 			formatted_state = formatted_state / 255
 		return formatted_state
 	
-	def decay_epsilon(self):
-		self.epsilon = self.epsilon*self.epsilon_decay
-		
-		if self.epsilon < self.final_epsilon:
-			self.epsilon = self.final_epsilon
 	
 	def train(self, max_episodes, max_timesteps, replay_memory_size, gamma, initial_epsilon,final_epsilon,epsilon_decay,minibatch_size,update_frequency,target_network_update_frequency,replay_start_size):
 		memory = deque(maxlen=replay_memory_size)
@@ -152,13 +160,13 @@ class DQN():
 						self.Q_target_network = clone_model(self.Q_network)
 						time_since_network_reset = 0
 				
-				if terminated or truncated:
+				if terminated or truncated or t == max_timesteps-1:
 					print("EPISODE TERMINATED. TOTAL REWARD = " + str(episode_reward))
 					episode_rewards.append(episode_reward)
 					if len(episode_rewards) < 100:
 						average_episode_rewards.append(np.mean(np.array(episode_rewards)))
 					else:
-						average_episode_rewards.append(np.mean(np.array(episode_rewards[-100])))
+						average_episode_rewards.append(np.mean(np.array(episode_rewards)))
 					break
 		
 		print("TRAINING COMPLETED")
